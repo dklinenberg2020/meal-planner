@@ -1,0 +1,1125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Meal Plan">
+<title>Week's Menu</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  /* =============================================
+     CONFIGURATION — Paste your Apps Script URL
+     ============================================= */
+
+  :root {
+    --clr-bg: #faf9f6;
+    --clr-surface: #ffffff;
+    --clr-border: #e8e4de;
+    --clr-border-light: #f0ede8;
+    --clr-text: #1a1a1a;
+    --clr-text-muted: #999;
+    --clr-text-dim: #aaa;
+    --clr-accent: #2d6a4f;
+    --clr-accent-light: #e8f5e9;
+    --clr-danger: #c1121f;
+    --clr-wf: #2d6a4f;
+    --clr-af: #e07b39;
+    --clr-costco: #c1121f;
+    --clr-any: #6c757d;
+    --radius: 10px;
+    --radius-sm: 6px;
+    --font-body: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+    --font-display: 'Playfair Display', Georgia, serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: var(--font-body);
+    background: var(--clr-bg);
+    color: var(--clr-text);
+    min-height: 100dvh;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* --- Layout --- */
+  .app { max-width: 600px; margin: 0 auto; padding: 20px 16px 100px; }
+
+  .header {
+    text-align: center;
+    padding: 16px 0 20px;
+    animation: fadeDown 0.5s ease;
+  }
+  .header h1 {
+    font-family: var(--font-display);
+    font-size: 30px;
+    font-weight: 400;
+    letter-spacing: -0.01em;
+    color: var(--clr-text);
+  }
+  .header .subtitle {
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--clr-text-dim);
+    margin-top: 4px;
+  }
+
+  /* --- Status bar --- */
+  .status-bar {
+    text-align: center;
+    padding: 6px;
+    font-size: 11px;
+    color: var(--clr-text-muted);
+    transition: all 0.3s;
+  }
+  .status-bar.saving { color: var(--clr-accent); }
+  .status-bar.error { color: var(--clr-danger); }
+  .status-bar.offline { color: var(--clr-af); }
+
+  /* --- Tabs --- */
+  .tabs {
+    display: flex;
+    background: var(--clr-border-light);
+    border-radius: 8px;
+    padding: 3px;
+    margin-bottom: 20px;
+  }
+  .tab-btn {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 9px 0;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    color: var(--clr-text-muted);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    background: var(--clr-surface);
+    color: var(--clr-text);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+  }
+
+  /* --- Section headers --- */
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .section-icon { font-size: 20px; }
+  .section-title { font-weight: 700; font-size: 15px; }
+  .section-desc { font-size: 11px; color: var(--clr-text-muted); letter-spacing: 0.02em; }
+  .section-divider { height: 1px; background: var(--clr-border); margin: 18px 0; }
+
+  /* --- Item rows --- */
+  .item-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--clr-border-light);
+    transition: opacity 0.2s;
+  }
+  .item-row.checked { opacity: 0.4; text-decoration: line-through; }
+
+  .item-row input[type="checkbox"] {
+    accent-color: var(--clr-accent);
+    width: 17px;
+    height: 17px;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .item-qty {
+    width: 36px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #555;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    text-align: center;
+    border-bottom: 1px dashed rgba(0,0,0,0.1);
+    padding: 2px;
+  }
+  .item-unit {
+    width: 50px;
+    font-size: 12px;
+    color: #888;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    border-bottom: 1px dashed rgba(0,0,0,0.1);
+    padding: 2px;
+  }
+  .item-name {
+    flex: 1;
+    font-size: 14px;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    color: var(--clr-text);
+    border-bottom: 1px dashed rgba(0,0,0,0.1);
+    padding: 2px 0;
+    min-width: 0;
+  }
+  .item-qty:focus, .item-unit:focus, .item-name:focus {
+    outline: none;
+    border-bottom-color: var(--clr-accent);
+    border-bottom-style: solid;
+  }
+
+  /* --- Store select --- */
+  .store-select {
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 2px 2px;
+    font-size: 10px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+    background: var(--clr-surface);
+    flex-shrink: 0;
+  }
+  .store-select.wf { color: var(--clr-wf); }
+  .store-select.af { color: var(--clr-af); }
+  .store-select.costco { color: var(--clr-costco); }
+  .store-select.any { color: var(--clr-any); }
+
+  .delete-btn {
+    border: none;
+    background: none;
+    color: var(--clr-danger);
+    cursor: pointer;
+    font-size: 18px;
+    padding: 0 2px;
+    opacity: 0.35;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .delete-btn:hover { opacity: 1; }
+
+  /* --- Add row --- */
+  .add-row {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+  }
+  .add-input {
+    flex: 1;
+    border: 1px solid #ddd;
+    border-radius: var(--radius-sm);
+    padding: 7px 10px;
+    font-size: 13px;
+    font-family: var(--font-body);
+    outline: none;
+    background: var(--clr-surface);
+  }
+  .add-input:focus { border-color: var(--clr-accent); }
+  .add-btn, .action-btn {
+    border: none;
+    background: var(--clr-accent);
+    color: #fff;
+    border-radius: var(--radius-sm);
+    padding: 7px 14px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .add-btn:active, .action-btn:active { transform: scale(0.97); }
+
+  /* --- Meal card --- */
+  .meal-card {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 12px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+  }
+  .meal-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .meal-header.collapsed { margin-bottom: 0; }
+  .collapse-toggle {
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--clr-text-dim);
+    width: 16px;
+    text-align: center;
+    user-select: none;
+  }
+  .meal-name-input {
+    flex: 1;
+    font-weight: 700;
+    font-size: 15px;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    color: var(--clr-text);
+    border-bottom: 1px dashed rgba(0,0,0,0.1);
+    padding: 2px 0;
+    min-width: 0;
+  }
+  .meal-name-input:focus { outline: none; border-bottom: 2px solid var(--clr-accent); }
+  .meal-source {
+    font-size: 11px;
+    color: var(--clr-text-muted);
+    font-style: italic;
+    border: none;
+    background: transparent;
+    font-family: var(--font-body);
+    width: 80px;
+    text-align: right;
+    padding: 2px;
+  }
+  .meal-source:focus { outline: none; }
+
+  .save-recipe-btn {
+    border: 1px solid #ddd;
+    background: var(--clr-bg);
+    border-radius: 5px;
+    padding: 3px 8px;
+    font-size: 11px;
+    cursor: pointer;
+    color: #666;
+    font-family: var(--font-body);
+    flex-shrink: 0;
+  }
+  .meal-ingredients { padding-left: 24px; }
+
+  /* --- Dinners toolbar --- */
+  .dinners-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 10px;
+  }
+  .btn-outline {
+    border: 1px solid #ddd;
+    background: var(--clr-bg);
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    font-size: 12px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    color: #555;
+    cursor: pointer;
+  }
+
+  /* --- Recipe drawer --- */
+  .recipe-drawer {
+    background: #f9f7f2;
+    border: 1px solid var(--clr-border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+  }
+  .recipe-drawer-title {
+    font-size: 12px;
+    font-weight: 700;
+    color: #666;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-bottom: 8px;
+  }
+  .recipe-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--clr-border);
+  }
+  .recipe-row:last-child { border-bottom: none; }
+  .recipe-name { font-weight: 600; font-size: 13px; }
+  .recipe-meta { font-size: 11px; color: var(--clr-text-muted); margin-left: 6px; }
+  .recipe-add-btn {
+    border: 1px solid var(--clr-accent);
+    background: var(--clr-surface);
+    color: var(--clr-accent);
+    border-radius: 5px;
+    padding: 3px 10px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: var(--font-body);
+  }
+  .recipe-delete-btn {
+    border: none;
+    background: none;
+    color: var(--clr-danger);
+    cursor: pointer;
+    font-size: 14px;
+    opacity: 0.4;
+    margin-left: 6px;
+  }
+
+  /* --- Grocery list --- */
+  .store-tag {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 4px;
+    color: #fff;
+  }
+  .store-tag.wf { background: var(--clr-wf); }
+  .store-tag.af { background: var(--clr-af); }
+  .store-tag.costco { background: var(--clr-costco); }
+  .store-tag.any { background: var(--clr-any); }
+
+  .grocery-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 0;
+    border-bottom: 1px solid var(--clr-border-light);
+  }
+  .grocery-qty { font-size: 13px; font-weight: 600; color: #555; min-width: 50px; }
+  .grocery-name { flex: 1; font-size: 14px; }
+  .merge-badge {
+    font-size: 10px;
+    color: var(--clr-accent);
+    background: var(--clr-accent-light);
+    padding: 1px 6px;
+    border-radius: 3px;
+    font-weight: 600;
+  }
+  .store-group { margin-bottom: 18px; }
+  .store-group-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+  .store-group-count { font-size: 11px; color: var(--clr-text-dim); }
+
+  /* --- Toggle --- */
+  .toggle-btn {
+    border: 1px solid #ddd;
+    border-radius: var(--radius-sm);
+    padding: 5px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--font-body);
+    cursor: pointer;
+  }
+  .toggle-btn.on { background: var(--clr-accent); color: #fff; border-color: var(--clr-accent); }
+  .toggle-btn.off { background: var(--clr-bg); color: #555; }
+
+  /* --- New week button --- */
+  .new-week-area { display: flex; justify-content: center; padding: 10px 0 20px; gap: 8px; }
+  .new-week-btn {
+    border: 1px solid #ddd;
+    background: var(--clr-bg);
+    color: var(--clr-text-muted);
+    border-radius: var(--radius-sm);
+    padding: 6px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+  .confirm-yes {
+    border: 1px solid var(--clr-danger);
+    background: var(--clr-surface);
+    color: var(--clr-danger);
+    border-radius: 5px;
+    padding: 4px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: var(--font-body);
+  }
+  .confirm-no {
+    border: 1px solid #ddd;
+    background: var(--clr-surface);
+    color: #666;
+    border-radius: 5px;
+    padding: 4px 12px;
+    font-size: 11px;
+    cursor: pointer;
+    font-family: var(--font-body);
+  }
+
+  /* --- Loading --- */
+  .loading {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 60vh;
+    gap: 16px;
+  }
+  .loading-spinner {
+    width: 32px;
+    height: 32px;
+    border: 3px solid var(--clr-border);
+    border-top-color: var(--clr-accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  .loading-text { color: var(--clr-text-muted); font-size: 13px; }
+
+  .setup-card {
+    background: var(--clr-surface);
+    border: 1px solid var(--clr-border);
+    border-radius: var(--radius);
+    padding: 24px;
+    margin-top: 20px;
+    text-align: center;
+  }
+  .setup-card h2 { font-family: var(--font-display); font-size: 22px; margin-bottom: 12px; font-weight: 400; }
+  .setup-card p { font-size: 13px; color: var(--clr-text-muted); margin-bottom: 16px; line-height: 1.6; }
+  .setup-input {
+    width: 100%;
+    border: 1px solid #ddd;
+    border-radius: var(--radius-sm);
+    padding: 10px 12px;
+    font-size: 13px;
+    font-family: var(--font-body);
+    margin-bottom: 12px;
+    outline: none;
+    text-align: center;
+  }
+  .setup-input:focus { border-color: var(--clr-accent); }
+
+  /* --- Animations --- */
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes fadeDown {
+    from { opacity: 0; transform: translateY(-8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+  }
+  .fade-in { animation: fadeIn 0.3s ease; }
+
+  /* --- Responsive --- */
+  @media (max-width: 400px) {
+    .meal-source { display: none; }
+    .item-unit { width: 36px; }
+  }
+</style>
+</head>
+<body>
+
+<div class="app" id="app"></div>
+
+<script>
+// ============================================================
+//  CONFIGURATION
+// ============================================================
+const STORAGE_KEY = "mealplanner_api_url";
+const LOCAL_DATA_KEY = "mealplanner_local";
+const DEBOUNCE_MS = 2000;
+
+let API_URL = localStorage.getItem(STORAGE_KEY) || "";
+let appData = null;
+let saveTimer = null;
+let currentView = "plan";
+let showRecipes = false;
+let confirmClear = false;
+let byStore = true;
+
+// ============================================================
+//  ID generation
+// ============================================================
+let idC = Date.now();
+const gid = () => `id_${idC++}`;
+
+// ============================================================
+//  Data layer
+// ============================================================
+async function loadData() {
+  if (!API_URL) return null;
+
+  // Try remote first
+  try {
+    const resp = await fetch(API_URL + "?action=read");
+    const data = await resp.json();
+    if (data && !data.error) {
+      localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+      return data;
+    }
+  } catch (e) {
+    console.warn("Remote load failed, trying local cache:", e);
+  }
+
+  // Fall back to local
+  const local = localStorage.getItem(LOCAL_DATA_KEY);
+  if (local) return JSON.parse(local);
+  return getDefaultData();
+}
+
+async function saveData(data) {
+  localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(data));
+  if (!API_URL) return;
+
+  setStatus("saving", "Saving...");
+  try {
+    const resp = await fetch(API_URL + "?action=save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    });
+    const result = await resp.json();
+    if (result.success) {
+      setStatus("saved", "Saved ✓");
+      setTimeout(() => setStatus("", ""), 2000);
+    } else {
+      setStatus("error", "Save failed");
+    }
+  } catch (e) {
+    setStatus("error", "Offline — saved locally");
+    setTimeout(() => setStatus("", ""), 3000);
+  }
+}
+
+function debounceSave() {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => saveData(appData), DEBOUNCE_MS);
+}
+
+function getDefaultData() {
+  return { sarah: [], danny: [], dinners: [], extras: [], savedRecipes: [] };
+}
+
+// ============================================================
+//  Consolidation
+// ============================================================
+function consolidate(data) {
+  const all = [];
+  data.sarah.forEach(i => all.push({ ...i, from: "Sarah's Stuff" }));
+  data.danny.forEach(i => all.push({ ...i, from: "Danny's Stuff" }));
+  data.dinners.forEach(m => m.ingredients.forEach(i => all.push({ ...i, from: m.name })));
+  data.extras.forEach(i => all.push({ ...i, from: "Extras" }));
+
+  const groups = {};
+  all.forEach(item => {
+    const key = item.name.toLowerCase().replace(/[^a-z0-9]/g, "");
+    if (!key) return;
+    if (!groups[key]) groups[key] = { name: item.name, items: [], store: item.store };
+    groups[key].items.push(item);
+  });
+
+  return Object.values(groups).map(g => {
+    const totalQty = g.items.reduce((s, i) => s + (parseFloat(i.qty) || 0), 0);
+    const units = [...new Set(g.items.map(i => i.unit).filter(Boolean))];
+    const sources = [...new Set(g.items.map(i => i.from))];
+    const stores = [...new Set(g.items.map(i => i.store))];
+    const checked = g.items.every(i => i.checked);
+    return {
+      name: g.name,
+      qty: totalQty,
+      unit: units.join("/"),
+      store: stores.length === 1 ? stores[0] : (stores.find(s => s !== "Any") || "Any"),
+      sources,
+      checked,
+    };
+  });
+}
+
+// ============================================================
+//  Status bar
+// ============================================================
+function setStatus(cls, text) {
+  const el = document.getElementById("status");
+  if (el) {
+    el.className = "status-bar" + (cls ? " " + cls : "");
+    el.textContent = text;
+  }
+}
+
+// ============================================================
+//  Store helpers
+// ============================================================
+const STORES = ["Whole Foods", "Amazon Fresh", "Costco", "Any"];
+function storeClass(s) {
+  if (s === "Whole Foods") return "wf";
+  if (s === "Amazon Fresh") return "af";
+  if (s === "Costco") return "costco";
+  return "any";
+}
+
+// ============================================================
+//  Render
+// ============================================================
+function render() {
+  const app = document.getElementById("app");
+
+  if (!API_URL) {
+    app.innerHTML = renderSetup();
+    return;
+  }
+
+  if (!appData) {
+    app.innerHTML = `<div class="header"><h1>Week's Menu</h1><p class="subtitle">Plan · Shop · Eat</p></div><div class="loading"><div class="loading-spinner"></div><div class="loading-text">Loading your meals...</div></div>`;
+    return;
+  }
+
+  let html = `
+    <div class="header">
+      <h1>Week's Menu</h1>
+      <p class="subtitle">Plan · Shop · Eat</p>
+    </div>
+    <div id="status" class="status-bar"></div>
+    <div class="tabs">
+      <button class="tab-btn ${currentView === 'plan' ? 'active' : ''}" onclick="switchView('plan')">Meal Plan</button>
+      <button class="tab-btn ${currentView === 'list' ? 'active' : ''}" onclick="switchView('list')">Grocery List</button>
+    </div>
+  `;
+
+  if (currentView === "plan") {
+    html += renderPlan();
+  } else {
+    html += renderGroceryList();
+  }
+
+  app.innerHTML = html;
+}
+
+function renderSetup() {
+  return `
+    <div class="header">
+      <h1>Week's Menu</h1>
+      <p class="subtitle">Plan · Shop · Eat</p>
+    </div>
+    <div class="setup-card">
+      <h2>Connect to Google Sheets</h2>
+      <p>Paste your Google Apps Script Web App URL below.<br>This connects the app to your shared spreadsheet.</p>
+      <input class="setup-input" id="apiInput" placeholder="https://script.google.com/macros/s/.../exec" />
+      <button class="action-btn" onclick="connectApi()" style="width:100%">Connect</button>
+      <p style="margin-top:14px;font-size:11px;color:#bbb">Or <a href="#" onclick="skipSetup();return false;" style="color:var(--clr-accent)">use offline mode</a> (data stays on this device only)</p>
+    </div>
+    <div class="setup-card" style="margin-top:12px;text-align:left;">
+      <p style="font-size:12px;font-weight:600;color:#666;margin-bottom:8px;">Quick setup guide:</p>
+      <p style="font-size:12px;line-height:1.7;">
+        1. Create a new Google Sheet<br>
+        2. Go to Extensions → Apps Script<br>
+        3. Paste the backend code (from apps-script.js)<br>
+        4. Replace YOUR_SHEET_ID_HERE with your Sheet ID<br>
+        5. Deploy → New Deployment → Web App<br>
+        6. Set access to "Anyone" and deploy<br>
+        7. Copy the URL and paste it above
+      </p>
+    </div>
+  `;
+}
+
+function renderPlan() {
+  let html = "";
+
+  // Sarah
+  html += renderPersonalSection("sarah", "☕", "Sarah's Stuff", "Breakfast, lunch & personal items", appData.sarah);
+  html += `<div class="section-divider"></div>`;
+
+  // Danny
+  html += renderPersonalSection("danny", "🍞", "Danny's Stuff", "Breakfast, lunch & personal items", appData.danny);
+  html += `<div class="section-divider"></div>`;
+
+  // Dinners
+  html += renderDinners();
+  html += `<div class="section-divider"></div>`;
+
+  // Extras
+  html += renderPersonalSection("extras", "🧃", "Extras", "Shared snacks & drinks", appData.extras);
+  html += `<div class="section-divider"></div>`;
+
+  // New Week
+  html += `<div class="new-week-area">`;
+  if (confirmClear) {
+    html += `<span style="font-size:12px;color:var(--clr-danger);line-height:28px;">Clear everything?</span>`;
+    html += `<button class="confirm-yes" onclick="clearWeek()">Yes, clear</button>`;
+    html += `<button class="confirm-no" onclick="confirmClear=false;render()">Cancel</button>`;
+  } else {
+    html += `<button class="new-week-btn" onclick="confirmClear=true;render()">🗑 New Week</button>`;
+    html += `<button class="new-week-btn" onclick="showSettings()">⚙ Settings</button>`;
+  }
+  html += `</div>`;
+
+  return html;
+}
+
+function renderPersonalSection(section, icon, title, desc, items) {
+  let html = `
+    <div class="section-header">
+      <span class="section-icon">${icon}</span>
+      <div>
+        <div class="section-title">${title}</div>
+        <div class="section-desc">${desc}</div>
+      </div>
+    </div>
+  `;
+
+  items.forEach((item, i) => {
+    html += renderItemRow(section, i, item);
+  });
+
+  html += `
+    <div class="add-row">
+      <input class="add-input" id="add-${section}" placeholder="+ Add item..."
+        onkeydown="if(event.key==='Enter')addItem('${section}')" />
+      <button class="add-btn" onclick="addItem('${section}')">Add</button>
+    </div>
+  `;
+
+  return html;
+}
+
+function renderItemRow(section, idx, item, mealIdx) {
+  const prefix = mealIdx !== undefined ? `meal-${mealIdx}-${idx}` : `${section}-${idx}`;
+  const checkFn = mealIdx !== undefined
+    ? `toggleMealIngredient(${mealIdx},${idx})`
+    : `toggleItem('${section}',${idx})`;
+  const delFn = mealIdx !== undefined
+    ? `deleteMealIngredient(${mealIdx},${idx})`
+    : `deleteItem('${section}',${idx})`;
+
+  return `
+    <div class="item-row ${item.checked ? 'checked' : ''}">
+      <input type="checkbox" ${item.checked ? 'checked' : ''} onchange="${checkFn}" />
+      <input class="item-qty" value="${esc(item.qty)}" onchange="updateField('${section}',${idx},'qty',this.value,${mealIdx !== undefined ? mealIdx : 'undefined'})" />
+      <input class="item-unit" value="${esc(item.unit)}" placeholder="unit" onchange="updateField('${section}',${idx},'unit',this.value,${mealIdx !== undefined ? mealIdx : 'undefined'})" />
+      <input class="item-name" value="${esc(item.name)}" placeholder="Item name" onchange="updateField('${section}',${idx},'name',this.value,${mealIdx !== undefined ? mealIdx : 'undefined'})" />
+      <select class="store-select ${storeClass(item.store)}" onchange="updateField('${section}',${idx},'store',this.value,${mealIdx !== undefined ? mealIdx : 'undefined'})">
+        ${STORES.map(s => `<option value="${s}" ${item.store === s ? 'selected' : ''}>${s}</option>`).join("")}
+      </select>
+      <button class="delete-btn" onclick="${delFn}">×</button>
+    </div>
+  `;
+}
+
+function renderDinners() {
+  let html = `
+    <div class="section-header">
+      <span class="section-icon">🍽</span>
+      <div style="flex:1">
+        <div class="section-title">Dinners</div>
+        <div class="section-desc">${appData.dinners.length} meal${appData.dinners.length !== 1 ? 's' : ''} this week</div>
+      </div>
+    </div>
+    <div class="dinners-toolbar">
+      <button class="btn-outline" onclick="toggleRecipes()">📖 Recipes ${appData.savedRecipes.length > 0 ? '(' + appData.savedRecipes.length + ')' : ''}</button>
+      <button class="action-btn" onclick="addMeal()" style="font-size:12px;padding:5px 12px;">+ Meal</button>
+    </div>
+  `;
+
+  if (showRecipes && appData.savedRecipes.length > 0) {
+    html += `<div class="recipe-drawer"><div class="recipe-drawer-title">Saved Recipes</div>`;
+    appData.savedRecipes.forEach((r, i) => {
+      html += `
+        <div class="recipe-row">
+          <div>
+            <span class="recipe-name">${esc(r.name)}</span>
+            ${r.source ? `<span class="recipe-meta">— ${esc(r.source)}</span>` : ''}
+            <span class="recipe-meta">(${r.ingredients.length} items)</span>
+          </div>
+          <div style="display:flex;align-items:center">
+            <button class="recipe-add-btn" onclick="loadRecipe(${i})">+ Add</button>
+            <button class="recipe-delete-btn" onclick="deleteRecipe(${i})">×</button>
+          </div>
+        </div>
+      `;
+    });
+    html += `</div>`;
+  }
+
+  appData.dinners.forEach((meal, mi) => {
+    const collapsed = meal._collapsed;
+    html += `
+      <div class="meal-card fade-in">
+        <div class="meal-header ${collapsed ? 'collapsed' : ''}">
+          <span class="collapse-toggle" onclick="toggleCollapse(${mi})">${collapsed ? '▸' : '▾'}</span>
+          <input class="meal-name-input" value="${esc(meal.name)}" placeholder="Meal name"
+            onchange="updateMealField(${mi},'name',this.value)" />
+          <input class="meal-source" value="${esc(meal.source || '')}" placeholder="source"
+            onchange="updateMealField(${mi},'source',this.value)" />
+          <button class="save-recipe-btn" onclick="saveRecipe(${mi})">💾 Save</button>
+          <button class="delete-btn" onclick="deleteMeal(${mi})">×</button>
+        </div>
+        ${!collapsed ? `<div class="meal-ingredients">
+          ${meal.ingredients.map((ing, ii) => renderItemRow('dinners', ii, ing, mi)).join("")}
+          <div class="add-row">
+            <input class="add-input" id="add-meal-${mi}" placeholder="+ Add ingredient..."
+              onkeydown="if(event.key==='Enter')addMealIngredient(${mi})" />
+            <button class="add-btn" onclick="addMealIngredient(${mi})">Add</button>
+          </div>
+        </div>` : ''}
+      </div>
+    `;
+  });
+
+  return html;
+}
+
+function renderGroceryList() {
+  const items = consolidate(appData);
+  const storeOrder = ["Whole Foods", "Amazon Fresh", "Costco", "Any"];
+
+  let html = `
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:14px">
+      <span style="font-size:20px">🛒</span>
+      <div style="flex:1">
+        <span style="font-weight:700;font-size:15px">Grocery List</span>
+        <span style="font-size:12px;color:var(--clr-text-muted);margin-left:8px">${items.length} item${items.length !== 1 ? 's' : ''}</span>
+      </div>
+      <button class="toggle-btn ${byStore ? 'on' : 'off'}" onclick="byStore=!byStore;render()">
+        ${byStore ? 'By Store ✓' : 'By Store'}
+      </button>
+    </div>
+  `;
+
+  if (byStore) {
+    const grouped = {};
+    items.forEach(i => {
+      const k = i.store || "Any";
+      if (!grouped[k]) grouped[k] = [];
+      grouped[k].push(i);
+    });
+
+    storeOrder.forEach(store => {
+      if (!grouped[store] || grouped[store].length === 0) return;
+      const storeItems = grouped[store].sort((a, b) => a.checked - b.checked);
+      html += `
+        <div class="store-group">
+          <div class="store-group-header">
+            <span class="store-tag ${storeClass(store)}">${store}</span>
+            <span class="store-group-count">${storeItems.length} item${storeItems.length !== 1 ? 's' : ''}</span>
+          </div>
+          ${storeItems.map(i => renderGroceryItem(i, false)).join("")}
+        </div>
+      `;
+    });
+  } else {
+    const sorted = items.sort((a, b) => a.checked - b.checked);
+    sorted.forEach(i => { html += renderGroceryItem(i, true); });
+  }
+
+  return html;
+}
+
+function renderGroceryItem(item, showStore) {
+  return `
+    <div class="grocery-item" style="opacity:${item.checked ? 0.4 : 1}">
+      <span class="grocery-qty">${item.qty}${item.unit ? ' ' + item.unit : ''}</span>
+      <span class="grocery-name" style="text-decoration:${item.checked ? 'line-through' : 'none'}">${esc(item.name)}</span>
+      ${showStore ? `<span class="store-tag ${storeClass(item.store)}">${item.store}</span>` : ''}
+      ${item.sources.length > 1 ? `<span class="merge-badge" title="${esc(item.sources.join(', '))}">×${item.sources.length}</span>` : ''}
+    </div>
+  `;
+}
+
+// ============================================================
+//  Actions
+// ============================================================
+function switchView(v) { currentView = v; render(); }
+
+function addItem(section) {
+  const input = document.getElementById("add-" + section);
+  if (!input || !input.value.trim()) return;
+  appData[section].push({ id: gid(), name: input.value.trim(), qty: "1", unit: "", store: "Any", checked: false });
+  debounceSave();
+  render();
+  setTimeout(() => {
+    const el = document.getElementById("add-" + section);
+    if (el) el.focus();
+  }, 50);
+}
+
+function deleteItem(section, idx) {
+  appData[section].splice(idx, 1);
+  debounceSave();
+  render();
+}
+
+function toggleItem(section, idx) {
+  appData[section][idx].checked = !appData[section][idx].checked;
+  debounceSave();
+  render();
+}
+
+function updateField(section, idx, field, value, mealIdx) {
+  if (mealIdx !== undefined && mealIdx !== "undefined" && !isNaN(mealIdx)) {
+    appData.dinners[mealIdx].ingredients[idx][field] = value;
+  } else {
+    appData[section][idx][field] = value;
+  }
+  debounceSave();
+}
+
+function addMeal() {
+  appData.dinners.push({ id: gid(), name: "", source: "", ingredients: [], _collapsed: false });
+  debounceSave();
+  render();
+}
+
+function deleteMeal(mi) {
+  appData.dinners.splice(mi, 1);
+  debounceSave();
+  render();
+}
+
+function updateMealField(mi, field, value) {
+  appData.dinners[mi][field] = value;
+  debounceSave();
+}
+
+function toggleCollapse(mi) {
+  appData.dinners[mi]._collapsed = !appData.dinners[mi]._collapsed;
+  render();
+}
+
+function addMealIngredient(mi) {
+  const input = document.getElementById("add-meal-" + mi);
+  if (!input || !input.value.trim()) return;
+  appData.dinners[mi].ingredients.push({ id: gid(), name: input.value.trim(), qty: "1", unit: "", store: "Any", checked: false });
+  debounceSave();
+  render();
+  setTimeout(() => {
+    const el = document.getElementById("add-meal-" + mi);
+    if (el) el.focus();
+  }, 50);
+}
+
+function deleteMealIngredient(mi, ii) {
+  appData.dinners[mi].ingredients.splice(ii, 1);
+  debounceSave();
+  render();
+}
+
+function toggleMealIngredient(mi, ii) {
+  appData.dinners[mi].ingredients[ii].checked = !appData.dinners[mi].ingredients[ii].checked;
+  debounceSave();
+  render();
+}
+
+function saveRecipe(mi) {
+  const meal = appData.dinners[mi];
+  if (!meal.name) return;
+  const exists = appData.savedRecipes.findIndex(r => r.name.toLowerCase() === meal.name.toLowerCase());
+  const recipe = {
+    id: meal.id,
+    name: meal.name,
+    source: meal.source || "",
+    ingredients: meal.ingredients.map(i => ({ ...i, checked: false })),
+  };
+  if (exists >= 0) {
+    appData.savedRecipes[exists] = recipe;
+  } else {
+    appData.savedRecipes.push(recipe);
+  }
+  debounceSave();
+  render();
+}
+
+function deleteRecipe(ri) {
+  appData.savedRecipes.splice(ri, 1);
+  debounceSave();
+  render();
+}
+
+function loadRecipe(ri) {
+  const r = appData.savedRecipes[ri];
+  appData.dinners.push({
+    id: gid(),
+    name: r.name,
+    source: r.source,
+    ingredients: r.ingredients.map(i => ({ ...i, id: gid(), checked: false })),
+    _collapsed: false,
+  });
+  showRecipes = false;
+  debounceSave();
+  render();
+}
+
+function toggleRecipes() {
+  showRecipes = !showRecipes;
+  render();
+}
+
+function clearWeek() {
+  appData.sarah = [];
+  appData.danny = [];
+  appData.dinners = [];
+  appData.extras = [];
+  confirmClear = false;
+  debounceSave();
+  render();
+}
+
+function connectApi() {
+  const input = document.getElementById("apiInput");
+  if (!input || !input.value.trim()) return;
+  API_URL = input.value.trim();
+  localStorage.setItem(STORAGE_KEY, API_URL);
+  render();
+  init();
+}
+
+function skipSetup() {
+  API_URL = "LOCAL_ONLY";
+  localStorage.setItem(STORAGE_KEY, API_URL);
+  appData = getDefaultData();
+  localStorage.setItem(LOCAL_DATA_KEY, JSON.stringify(appData));
+  render();
+}
+
+function showSettings() {
+  const newUrl = prompt("Google Sheets API URL (or leave empty to go offline):", API_URL === "LOCAL_ONLY" ? "" : API_URL);
+  if (newUrl === null) return; // cancelled
+  if (newUrl.trim()) {
+    API_URL = newUrl.trim();
+    localStorage.setItem(STORAGE_KEY, API_URL);
+    init();
+  } else {
+    API_URL = "LOCAL_ONLY";
+    localStorage.setItem(STORAGE_KEY, API_URL);
+    render();
+  }
+}
+
+function esc(s) {
+  if (!s) return "";
+  return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+// ============================================================
+//  Init
+// ============================================================
+async function init() {
+  render(); // show loading state
+
+  if (API_URL === "LOCAL_ONLY") {
+    const local = localStorage.getItem(LOCAL_DATA_KEY);
+    appData = local ? JSON.parse(local) : getDefaultData();
+  } else {
+    appData = await loadData();
+    if (!appData) appData = getDefaultData();
+  }
+
+  render();
+}
+
+if (API_URL) {
+  init();
+} else {
+  render();
+}
+</script>
+</body>
+</html>
